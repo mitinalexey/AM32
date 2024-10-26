@@ -12,7 +12,11 @@
 
 #include "main.h"
 #define INTERVAL_TIMER_COUNT (INTERVAL_TIMER->cval)
+#ifdef MX_IWDG_ENABLE
 #define RELOAD_WATCHDOG_COUNTER() (WDT->cmd = WDT_CMD_RELOAD)
+#else
+#define RELOAD_WATCHDOG_COUNTER()
+#endif
 #define DISABLE_COM_TIMER_INT() (COM_TIMER->iden &= ~TMR_OVF_INT)
 #define ENABLE_COM_TIMER_INT() (COM_TIMER->iden |= TMR_OVF_INT)
 #define SET_AND_ENABLE_COM_INT(time)                                    \

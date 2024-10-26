@@ -80,11 +80,13 @@ void AT_COMP_Init(void)
 
 void MX_IWDG_Init(void)
 {
+#ifdef MX_IWDG_ENABLE
     WDT->cmd = WDT_CMD_UNLOCK;
     WDT->cmd = WDT_CMD_ENABLE;
     WDT->div = WDT_CLK_DIV_32;
     WDT->rld = 4000;
     WDT->cmd = WDT_CMD_RELOAD;
+#endif // MX_IWDG_ENABLE
 }
 
 void TIM1_Init(void)

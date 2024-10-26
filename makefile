@@ -1,9 +1,9 @@
-QUIET = @
+#QUIET = @
 
 # tools
-CC = $(ARM_SDK_PREFIX)gcc
-CP = $(ARM_SDK_PREFIX)objcopy
-ECHO = echo
+#CC = $(ARM_SDK_PREFIX)gcc
+#CP = $(ARM_SDK_PREFIX)objcopy
+#ECHO = echo
 
 # common variables
 IDENTIFIER := AM32
@@ -15,16 +15,9 @@ MAIN_INC_DIR := Inc
 
 SRC_DIRS_COMMON := $(MAIN_SRC_DIR)
 
-# Include processor specific makefiles
-include f051makefile.mk
-include g071makefile.mk
-include f031makefile.mk
-include f421makefile.mk
-include e230makefile.mk
-include f415makefile.mk
-
 # Default MCU type to F051
-MCU_TYPE ?= F051
+# MCU_TYPE ?= f421
+TARGET ?= TEKKO32_F421
 
 # additional libs
 LIBS := -lc -lm -lnosys
@@ -39,81 +32,235 @@ LDFLAGS_COMMON := -specs=nano.specs $(LIBS) -Wl,--gc-sections -Wl,--print-memory
 
 # Working directories
 ROOT := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
+PROJECT_DIR     := $(ROOT)/project
+BOARD_DIR 		:= $(PROJECT_DIR)/board
+STDPERIPH_DIR 	:= $(ROOT)/$(HAL_FOLDER)/f421
+OBJECT_DIR      := $(ROOT)/debug
+BIN_DIR         := $(ROOT)/debug
+$(warning STDPERIPH_DIR := $(STDPERIPH_DIR))
 
-# Search source files
-SRC_COMMON := $(foreach dir,$(SRC_DIRS_COMMON),$(wildcard $(dir)/*.[cs]))
+LINKER_DIR 		:= $(ROOT)/$(HAL_FOLDER)/f421
+$(warning LINKER_DIR := $(LINKER_DIR))
 
-VERSION_MAJOR := $(shell grep "#define VERSION_MAJOR" $(MAIN_SRC_DIR)/main.c | awk '{print $$3}' )
-VERSION_MINOR := $(shell grep "#define VERSION_MINOR" $(MAIN_SRC_DIR)/main.c | awk '{print $$3}' )
+# C sources
+C_SOURCES 	:= $(shell find -L $(STDPERIPH_DIR) -name '*.c')
+C_SOURCES 	+= $(shell find -L $(PROJECT_DIR) -name '*.c')
+CSOURCES = $(subst ./,,$(C_SOURCES))
+$(warning CSOURCES := $(CSOURCES)) $(info  )
 
-FIRMWARE_VERSION := $(VERSION_MAJOR).$(VERSION_MINOR)
+# C++ sources
+CXX_SOURCES	:= $(shell find -L $(BOARD_DIR) -name '*.cpp')
+CXXSOURCES 	:= $(subst ./,,$(CXX_SOURCES))
+$(warning CXXSOURCES := $(CXXSOURCES)) $(info  )
 
-TARGET_BASENAME = $(BIN_DIR)/$(IDENTIFIER)_$(TARGET)_$(FIRMWARE_VERSION)
+# ASM sources
+ASM_SOURCES =	$(shell find -L $(PROJECT_DIR) -name '*.s')
+ASMSOURCES = $(subst ./,,$(ASM_SOURCES))
+$(warning ASMSOURCES := $(ASMSOURCES)) $(info )
 
-# Build tools, so we all share the same versions
-# import macros common to all supported build systems
-include $(ROOT)/make/system-id.mk
+# Autodetect inc dirs
+INC_DIRS1 	:= $(dir $(shell find -L $(PROJECT_DIR) -name '*.h'))
+INC_DIRS1 	+= $(dir $(shell find -L $(STDPERIPH_DIR) -name '*.h'))
+INC_DIRS2 	:= $(sort $(INC_DIRS1))
+INC_DIRS3 	:= $(subst ./,,$(INC_DIRS2))
 
-# configure some directories that are relative to wherever ROOT_DIR is located
-BIN_DIR := $(ROOT)/obj
+INCLUDE_DIRS := $(subst / , ,$(INC_DIRS3))
+$(warning INCLUDE_DIRS := $(INCLUDE_DIRS)) $(info  )
 
-TOOLS_DIR ?= $(ROOT)/tools
-DL_DIR := $(ROOT)/downloads
+# add to .vscode\c_cpp_properties.json
+$(warning add to .vscode\c_cpp_properties.json)
+SRC := 	$(subst ./,,$(ASMSOURCES)) \
+		$(subst ./,,$(CSOURCES)) \
+		$(subst ./,,$(CXXSOURCES))
 
-.PHONY : clean all binary f051 g071 f031 e230 f421 f415
-all : $(TARGETS_F051) $(TARGETS_G071) $(TARGETS_F031) $(TARGETS_E230) $(TARGETS_F421) $(TARGETS_F415)
-f051 : $(TARGETS_F051)
-g071 : $(TARGETS_G071)
-f031 : $(TARGETS_F031)
-e230 : $(TARGETS_E230)
-f421 : $(TARGETS_F421)
-f415 : $(TARGETS_F415)
+$(info SRC := $(SRC)) $(info  )
+SRC_DIRS_1 	:= $(dir $(SRC)) 
+SRC_DIRS_2 	:= $(subst / , ,$(SRC_DIRS_1))
+SRC_DIRS_3 	:= $(sort $(SRC_DIRS_2))
 
-clean :
-	rm -rf $(BIN_DIR)/*
+SRC_DIRS_4 	:= $(addsuffix "__ ,$(addprefix "$${env:myWorkspacePath}/,$(SRC_DIRS_3)))
+SRC_DIRS 	:= $(SRC_DIRS_4)
 
-binary : $(TARGET_BASENAME).bin
-	@$(ECHO) All done
+includePath :=	$(addsuffix "__ ,$(addprefix "$${env:myWorkspacePath}/,$(INCLUDE_DIRS)))
+includePath +=	$(SRC_DIRS)
 
-$(TARGETS_F051) :
-	@$(MAKE) -s MCU_TYPE=F051 TARGET=$@ binary
+$(info "includePath": )
+$(info $(includePath)) $(info  )
 
-$(TARGETS_G071) :
-	@$(MAKE) -s MCU_TYPE=G071 TARGET=$@ binary
+# Tools
+GNU_TYPE = gcc-arm-none-eabi-10.3-2021.10
+#GNU_TYPE = arm-gnu-toolchain-13.2.Rel1-mingw-w64-i686-arm-none-eabi
+GCC_PATH = $(TOOLS_DIR)/$(GNU_TYPE)/bin
 
-$(TARGETS_F031) :
-	@$(MAKE) -s MCU_TYPE=F031 TARGET=$@ binary
+GCC_REQUIRED_VERSION ?= 10.3.1
+#GCC_REQUIRED_VERSION ?= 13.2.1
 
-$(TARGETS_E230) :
-	@$(MAKE) -s MCU_TYPE=E230 TARGET=$@ binary
+# Tool names
+TOOLS_DIR  		:= C:/AT32IDE/platform/tools
+ARM_SDK_DIR 	:= $(TOOLS_DIR)/$(GNU_TYPE)
 
-$(TARGETS_F421) :
-	@$(MAKE) -s MCU_TYPE=F421 TARGET=$@ binary	
+ARM_SDK_PREFIX 	:= $(ARM_SDK_DIR)/bin/arm-none-eabi-
+CROSS_CC    	:= $(ARM_SDK_PREFIX)gcc
+CROSS_CXX   	:= $(ARM_SDK_PREFIX)g++
+CROSS_GDB   	:= $(ARM_SDK_PREFIX)gdb
+OBJCOPY     	:= $(ARM_SDK_PREFIX)objcopy
+OBJDUMP     	:= $(ARM_SDK_PREFIX)objdump
+READELF     	:= $(ARM_SDK_PREFIX)readelf
+SIZE        	:= $(ARM_SDK_PREFIX)size
 
-$(TARGETS_F415) :
-	@$(MAKE) -s MCU_TYPE=F415 TARGET=$@ binary		
+MAKE 	:= C:/msys64/mingw64/bin/make.exe
 
-# Compile target
-$(TARGET_BASENAME).elf: SRC := $(SRC_COMMON) $(SRC_$(MCU_TYPE))
-$(TARGET_BASENAME).elf: CFLAGS := $(MCU_F051) $(CFLAGS_$(MCU_TYPE)) $(CFLAGS_COMMON)
-$(TARGET_BASENAME).elf: LDFLAGS := $(LDFLAGS_COMMON) $(LDFLAGS_$(MCU_TYPE)) -T$(LDSCRIPT_$(MCU_TYPE))
-$(TARGET_BASENAME).elf: $(SRC)
-	@$(ECHO) Compiling $(notdir $@)
-	$(QUIET)mkdir -p $(dir $@)
-	$(QUIET)$(CC) $(CFLAGS) $(LDFLAGS) -MMD -MP -MF $(@:.elf=.d) -o $(@) $(SRC)
+# Target Output Files
+TARGET_HEX 		= $(BIN_DIR)/$(TARGET).hex
+TARGET_BIN 		= $(BIN_DIR)/$(TARGET).bin
+TARGET_ELF 		= $(OBJECT_DIR)/$(TARGET).elf
+TARGET_LST      = $(OBJECT_DIR)/$(TARGET).lst
+TARGET_OBJ_DIR  = $(OBJECT_DIR)/$(TARGET)
+TARGET_MAP      = $(OBJECT_DIR)/$(TARGET).map
+$(warning TARGET_HEX := $(TARGET_HEX)) $(info  )
+$(warning TARGET_BIN := $(TARGET_BIN)) $(info  )
+$(warning TARGET_ELF := $(TARGET_ELF)) $(info  )
+$(warning TARGET_LST := $(TARGET_LST)) $(info  )
+$(warning TARGET_MAP := $(TARGET_MAP)) $(info  )
 
-# Generate bin and hex files
-$(TARGET_BASENAME).bin: $(TARGET_BASENAME).elf
-	@$(ECHO) Generating $(notdir $@)
-	$(QUIET)$(CP) -O binary $(<) $@
-	$(QUIET)$(CP) $(<) -O ihex $(@:.bin=.hex)
+# CFLAGS
+# ASM
+ASM_DEFS =
+ASM_INCLUDES = 
+ASM_WARNING =
 
-# mkdirs
-$(DL_DIR):
-	$(QUIET)mkdir -p $@
+# C
+MCU_FLAGS = -mcpu=cortex-m4 -mthumb
+# -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
-$(TOOLS_DIR):
-	$(QUIET)mkdir -p $@
+# Preprocessor defines -D
+C_DEFS :=	TRACE \
+			OS_USE_TRACE_SEMIHOSTING_DEBUG \
+			AT32F421K8U7 \
+			USE_STDPERIPH_DRIVER
+			
+OPTIMIZATION_FLAGS = -Os -ffunction-sections
 
-# include the tools makefile
-include $(ROOT)/make/tools.mk
+WARNING_FLAGS = 
+
+DEBUG_FLAGS := -g
+
+GNU_FLAGS = -std=gnu17
+
+# C++
+
+# compile gcc flags
+ASFLAGS =	$(MCU_FLAGS) \
+			$(OPTIMIZATION_FLAGS) \
+			$(ASM_WARNING) \
+			$(DEBUG_FLAGS) \
+			$(addprefix -D,$(ASM_DEFS)) \
+			-x assembler-with-cpp \
+			-MMD -MP -MF"$(@:%.o=%.d)"
+
+MCFLAGS +=	$(MCU_FLAGS) \
+			$(OPTIMIZATION_FLAGS) \
+			$(WARNING_FLAGS) \
+			$(DEBUG_FLAGS) \
+			$(addprefix -D,$(C_DEFS)) \
+			$(addprefix -I,$(INCLUDE_DIRS)) \
+			-MMD -MP -MF"$(@:%.o=%.d)"
+			
+CFLAGS = $(MCFLAGS) -std=gnu17
+CXXFLAGS = $(MCFLAGS) -std=gnu++17 -fabi-version=0
+
+$(warning ASFLAGS := $(ASFLAGS)) $(info  )
+$(warning CFLAGS := $(CFLAGS)) $(info  )
+$(warning CXXFLAGS := $(CXXFLAGS)) $(info )
+
+# LDFLAGS
+# link script
+LD_SCRIPT = $(LINKER_DIR)/AT32F421x6_FLASH.ld
+$(warning LD_SCRIPT := $(LD_SCRIPT)) $(info )
+
+EXTRA_LD_FLAGS :=	--specs=nano.specs \
+					--specs=nosys.specs
+#					-u _printf_float \
+					-u _scanf_float
+					
+
+LD_FLAGS :=	$(MCU_FLAGS) \
+			$(OPTIMIZATION_FLAGS) \
+			$(WARNING_FLAGS) \
+			$(DEBUG_FLAGS) \
+			-T$(LD_SCRIPT) \
+			-Xlinker --gc-sections \
+			-Wl,-gc-sections,-Map,$(TARGET_MAP) \
+			-Wl,--print-memory-usage \
+			$(EXTRA_LD_FLAGS)
+$(warning LD_FLAGS := $(LD_FLAGS)) $(info  )
+
+# Object List
+OBJECTS  = 	$(addsuffix .o,$(addprefix $(TARGET_OBJ_DIR)/,$(basename $(ASMSOURCES))))
+OBJECTS += 	$(addsuffix .o,$(addprefix $(TARGET_OBJ_DIR)/,$(basename $(CSOURCES))))
+OBJECTS += 	$(addsuffix .o,$(addprefix $(TARGET_OBJ_DIR)/,$(basename $(CXXSOURCES))))
+#$(warning TARGET_OBJ_DIR := $(TARGET_OBJ_DIR)) $(info  )
+#$(warning OBJECTS | $(OBJECTS)) $(info )
+
+# Build
+
+$(TARGET_LST): $(TARGET_ELF)
+	$(OBJDUMP) -S --disassemble $< > $@
+	
+$(TARGET_HEX): $(TARGET_ELF)
+	@echo "Creating HEX $(TARGET_HEX)"
+	$(OBJCOPY) -O ihex --set-start 0x08000000 $< $@
+
+$(TARGET_BIN): $(TARGET_ELF)
+	@echo "Creating BIN $(TARGET_BIN)"
+	$(OBJCOPY) -O binary $< $@
+	
+$(TARGET_ELF): $(OBJECTS)
+	@echo "Linking $(TARGET)"
+	$(CROSS_CXX) -o $@ $^ $(LD_FLAGS)
+	$(SIZE) $(TARGET_ELF)
+
+$(TARGET_OBJ_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	@echo %%_cpp $(notdir $<)
+	@$(CROSS_CXX) -c -o $@ $(CXXFLAGS) $<
+	
+$(TARGET_OBJ_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	@echo %%_c $(notdir $<)
+	@$(CROSS_CC) -c -o $@ $(CFLAGS) $<
+
+$(TARGET_OBJ_DIR)/%.o: %.s
+	@mkdir -p $(dir $@)
+	@echo "%%_s $(notdir $<)"
+	@$(CROSS_CC) -c -o $@ $(ASFLAGS) $<
+
+$(TARGET_OBJ_DIR)/%.o: %.S
+	@mkdir -p $(dir $@)
+	@echo "%%_S $(notdir $<)"
+	@$(CROSS_CC) -c -o $@ $(ASFLAGS) $<
+
+#################################
+# Recipes
+#################################
+.PHONY: all clean size elf
+
+clean:
+	@echo "Cleaning $(TARGET)"
+	rm -rf $(TARGET_OBJ_DIR)
+	rm -f $(TARGET_ELF) $(TARGET_HEX) $(TARGET_MAP) $(TARGET_LST)
+	@echo "Cleaning $(TARGET) succeeded."
+
+all: $(TARGET_HEX) $(TARGET_BIN)
+
+size: 
+	@echo "Size $(TARGET)"
+	$(SIZE) -A $(TARGET_ELF)
+
+elf: 
+	@echo "Size $(TARGET)"
+	$(READELF) -S -W $(TARGET_ELF)
+
+# *** EOF ***
+# $(error STOP)
+# https://habr.com/ru/companies/inforion/articles/460247/

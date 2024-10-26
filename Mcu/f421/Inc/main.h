@@ -36,6 +36,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef MAIN_H
 #define MAIN_H
 
+//#define MX_IWDG_ENABLE
+
 #include "at32f421.h"
 #include "at32f421_conf.h"
 // #include "at32f421_dma.h"

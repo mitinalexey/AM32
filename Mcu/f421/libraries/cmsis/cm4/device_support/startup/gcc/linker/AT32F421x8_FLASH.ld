@@ -1,11 +1,10 @@
 /*
 *****************************************************************************
 **
-**  File        : AT32F421x6_FLASH.ld
+**  File        : AT32F421x8_FLASH.ld
 **
-**  Abstract    : Linker script for AT32F421x6 Device with
-**                32KByte FLASH, 16KByte RAM
-**                AT32F421K8U7  64KByte FLASH, 16KByte RAM
+**  Abstract    : Linker script for AT32F421x8 Device with
+**                64KByte FLASH, 16KByte RAM
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.
@@ -29,28 +28,12 @@ _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 
 /* Specify the memory areas */
-
 MEMORY
 {
-ISR_VECTOR_SPACE (rx) : ORIGIN = 0x08000000, LENGTH = 1K
-FLASH (rx)            : ORIGIN = 0x08001000, LENGTH = 27K
-FLASH_VERSION (rx)    : ORIGIN = 0x08007C00 - 48, LENGTH = 14
-FILE_NAME     (rx)    : ORIGIN = 0x08007C00 - 32, LENGTH = 32
-EEPROM        (rx)    : ORIGIN = 0x08007C00, LENGTH = 1K
-RAM (xrw)             : ORIGIN = 0x20000000, LENGTH = 16K
-}
-
-/*
-MEMORY
-{
-ISR_VECTOR (rx)     : ORIGIN = 0x08000000, LENGTH = 1K
-FLASH (rx)      : ORIGIN = 0x08001000, LENGTH = 27K + 32K
-FLASH_VERSION (rx)  : ORIGIN = 0x08000 + 0x08007C00 - 48, LENGTH = 14
-FILE_NAME     (rx)  : ORIGIN = 0x08000 + 0x08007C00 - 32, LENGTH = 32
-EEPROM        (rx)  : ORIGIN = 0x08000 + 0x08007C00, LENGTH = 1K
+FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 64K
 RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 16K
 }
-*/
+
 /* Define output sections */
 SECTIONS
 {
@@ -60,7 +43,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >ISR_VECTOR_SPACE
+  } >FLASH
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -115,20 +98,6 @@ SECTIONS
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
   } >FLASH
-
-  .firmware_version :
-  {
-    . = ALIGN(4);
-	KEEP (*(.firmware_info))
-  } >FLASH_VERSION
-
-  /* The file name */
-  .file_name :
-  {
-    . = ALIGN(4);
-	KEEP (*(.file_name))
-  } >FILE_NAME
-
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);

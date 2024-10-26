@@ -1,9 +1,4 @@
-obj/
+debug/
 downloads/
 tools/
-.vscode
-Keil_Projects/*.uvgui.*
-Keil_Projects/*.uvguix.*
-Keil_Projects/Objects
-Keil_Projects/RTE/*
-Keil_Projects/Listings
+.vscode/
